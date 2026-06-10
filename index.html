@@ -1,0 +1,1729 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ぽちっとミニゲームパーク</title>
+  <style>
+    :root {
+      --ink: #223047;
+      --muted: #667085;
+      --paper: #fffaf0;
+      --panel: #ffffff;
+      --line: #dae0ea;
+      --pink: #ff5f91;
+      --mint: #35c7a3;
+      --sky: #4ea8ff;
+      --sun: #ffc43d;
+      --leaf: #6dbb43;
+      --danger: #ff6b4a;
+      --shadow: 0 18px 44px rgba(34, 48, 71, .16);
+      color-scheme: light;
+      font-family: ui-rounded, "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 12%, rgba(255, 196, 61, .28), transparent 30%),
+        radial-gradient(circle at 88% 10%, rgba(78, 168, 255, .22), transparent 28%),
+        linear-gradient(145deg, #fff7d7 0%, #e9fbff 48%, #fff0f5 100%);
+      overflow: hidden;
+      touch-action: none;
+      user-select: none;
+    }
+
+    button {
+      font: inherit;
+      color: inherit;
+      border: 0;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .app {
+      width: min(1120px, 100vw);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: max(14px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 12px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .logo {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: conic-gradient(from 20deg, var(--pink), var(--sun), var(--mint), var(--sky), var(--pink));
+      box-shadow: 0 8px 0 rgba(34, 48, 71, .12);
+      flex: 0 0 auto;
+    }
+
+    .logo svg { width: 31px; height: 31px; filter: drop-shadow(0 2px 0 rgba(0,0,0,.12)); }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.25rem, 3.4vw, 2.05rem);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: .86rem;
+    }
+
+    .hud {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      min-width: 96px;
+      height: 42px;
+      padding: 0 12px;
+      display: grid;
+      align-content: center;
+      border: 2px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .82);
+      box-shadow: 0 5px 0 rgba(34, 48, 71, .08);
+      text-align: center;
+      font-weight: 900;
+    }
+
+    .pill span {
+      display: block;
+      color: var(--muted);
+      font-size: .66rem;
+      line-height: 1;
+    }
+
+    .icon-btn,
+    .primary-btn,
+    .secondary-btn {
+      min-height: 44px;
+      border-radius: 8px;
+      font-weight: 950;
+      box-shadow: 0 6px 0 rgba(34, 48, 71, .16);
+      transition: transform .12s ease, box-shadow .12s ease;
+    }
+
+    .icon-btn:active,
+    .primary-btn:active,
+    .secondary-btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 3px 0 rgba(34, 48, 71, .14);
+    }
+
+    .icon-btn {
+      width: 46px;
+      display: grid;
+      place-items: center;
+      background: #fff;
+      border: 2px solid var(--line);
+    }
+
+    .icon-btn svg { width: 24px; height: 24px; stroke: currentColor; stroke-width: 3; fill: none; }
+
+    .primary-btn {
+      padding: 0 18px;
+      background: var(--pink);
+      color: #fff;
+    }
+
+    .secondary-btn {
+      padding: 0 16px;
+      background: #fff;
+      border: 2px solid var(--line);
+    }
+
+    main {
+      min-height: 0;
+      position: relative;
+      display: grid;
+    }
+
+    .screen {
+      min-height: 0;
+      display: none;
+      animation: popIn .22s ease both;
+    }
+
+    .screen.active { display: grid; }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: translateY(8px) scale(.99); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .home {
+      align-content: center;
+      gap: 18px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.06fr .94fr;
+      gap: 18px;
+      align-items: stretch;
+      min-height: 260px;
+    }
+
+    .hero-copy,
+    .mascot-stage,
+    .game-card,
+    .play-shell,
+    .result-panel {
+      background: rgba(255, 255, 255, .84);
+      border: 2px solid rgba(34, 48, 71, .11);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero-copy {
+      padding: clamp(18px, 4vw, 34px);
+      display: grid;
+      align-content: center;
+      gap: 12px;
+    }
+
+    .hero-copy h2 {
+      margin: 0;
+      font-size: clamp(2.1rem, 8vw, 5.1rem);
+      line-height: .92;
+      letter-spacing: 0;
+      max-width: 720px;
+    }
+
+    .hero-copy p {
+      margin: 0;
+      max-width: 560px;
+      color: var(--muted);
+      font-size: clamp(.96rem, 2vw, 1.1rem);
+      font-weight: 850;
+      line-height: 1.7;
+    }
+
+    .mascot-stage {
+      position: relative;
+      min-height: 260px;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, .3), rgba(255, 255, 255, .9)),
+        repeating-linear-gradient(90deg, rgba(255, 95, 145, .15) 0 24px, rgba(78, 168, 255, .14) 24px 48px);
+    }
+
+    .mascot-stage::before {
+      content: "";
+      position: absolute;
+      inset: auto 7% 10% 7%;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(34, 48, 71, .12);
+      filter: blur(2px);
+    }
+
+    .mascot {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: min(230px, 58vw);
+      height: min(230px, 58vw);
+      transform: translate(-50%, -48%);
+    }
+
+    .select-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .game-card {
+      min-height: 178px;
+      padding: 14px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 8px;
+      overflow: hidden;
+      text-align: left;
+      position: relative;
+    }
+
+    .game-card:hover { transform: translateY(-2px); }
+
+    .game-card h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      line-height: 1.2;
+    }
+
+    .game-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: .86rem;
+      font-weight: 800;
+      line-height: 1.45;
+    }
+
+    .card-art {
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .card-art svg { width: 120px; height: 64px; }
+
+    .card-chip {
+      justify-self: start;
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: #f3f6fb;
+      color: var(--ink);
+      font-size: .75rem;
+      font-weight: 950;
+    }
+
+    .play-shell {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      overflow: hidden;
+    }
+
+    .play-header {
+      min-height: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 10px 12px;
+      border-bottom: 2px solid rgba(34, 48, 71, .1);
+    }
+
+    .play-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .play-title strong {
+      font-size: clamp(1rem, 2.5vw, 1.35rem);
+      line-height: 1.1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .badge {
+      flex: 0 0 auto;
+      min-width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 950;
+      box-shadow: inset 0 -4px 0 rgba(0,0,0,.12);
+    }
+
+    .play-area {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,.2)),
+        radial-gradient(circle at 50% 100%, rgba(53, 199, 163, .18), transparent 45%);
+    }
+
+    .guide {
+      min-height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-top: 2px solid rgba(34, 48, 71, .1);
+      color: var(--muted);
+      font-size: .9rem;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    .kbd {
+      display: inline-grid;
+      place-items: center;
+      min-width: 28px;
+      height: 28px;
+      padding: 0 8px;
+      border-radius: 7px;
+      background: #fff;
+      color: var(--ink);
+      border: 2px solid var(--line);
+      box-shadow: 0 3px 0 rgba(34, 48, 71, .1);
+      font-size: .78rem;
+    }
+
+    .toast {
+      position: absolute;
+      left: 50%;
+      top: 16px;
+      transform: translateX(-50%);
+      min-width: 150px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: rgba(34, 48, 71, .92);
+      color: #fff;
+      text-align: center;
+      font-weight: 950;
+      z-index: 20;
+      pointer-events: none;
+      animation: toast .7s ease both;
+    }
+
+    @keyframes toast {
+      0% { opacity: 0; transform: translate(-50%, -8px) scale(.96); }
+      18%, 78% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -12px) scale(.96); }
+    }
+
+    .result-screen {
+      place-items: center;
+    }
+
+    .result-panel {
+      width: min(520px, 100%);
+      padding: 26px;
+      display: grid;
+      gap: 14px;
+      text-align: center;
+    }
+
+    .result-panel h2 {
+      margin: 0;
+      font-size: clamp(1.7rem, 8vw, 3rem);
+      line-height: 1;
+    }
+
+    .result-score {
+      font-size: clamp(2.4rem, 12vw, 5rem);
+      line-height: 1;
+      font-weight: 1000;
+      color: var(--pink);
+    }
+
+    .result-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .tea-game {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-columns: minmax(180px, .9fr) minmax(230px, 1.1fr);
+      align-items: center;
+      gap: 20px;
+      padding: 22px;
+    }
+
+    .kettle-zone {
+      height: 100%;
+      min-height: 260px;
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+
+    .kettle {
+      width: min(260px, 42vw);
+      height: min(230px, 36vw);
+      max-width: 100%;
+      position: relative;
+      transform-origin: 72% 63%;
+      transition: transform .12s ease;
+    }
+
+    .pouring .kettle { transform: rotate(-15deg) translateY(-3px); }
+
+    .kettle-body {
+      position: absolute;
+      inset: 23% 18% 8% 4%;
+      border-radius: 46% 44% 39% 42%;
+      background: linear-gradient(145deg, #ffdc65, #ff9364);
+      border: 6px solid #223047;
+      box-shadow: inset -10px -14px 0 rgba(255, 95, 145, .18);
+    }
+
+    .kettle-lid {
+      position: absolute;
+      left: 25%;
+      top: 10%;
+      width: 36%;
+      height: 20%;
+      border-radius: 50% 50% 30% 30%;
+      background: #fff;
+      border: 6px solid #223047;
+    }
+
+    .kettle-spout {
+      position: absolute;
+      right: 0;
+      top: 36%;
+      width: 34%;
+      height: 20%;
+      border: 6px solid #223047;
+      border-left: 0;
+      border-radius: 0 70% 45% 0;
+      background: #ffb55a;
+      transform: rotate(-8deg);
+    }
+
+    .kettle-handle {
+      position: absolute;
+      left: -2%;
+      top: 33%;
+      width: 24%;
+      height: 44%;
+      border: 7px solid #223047;
+      border-right: 0;
+      border-radius: 50% 0 0 50%;
+    }
+
+    .tea-stream {
+      position: absolute;
+      right: 14%;
+      top: 47%;
+      width: 20px;
+      height: 0;
+      background: linear-gradient(180deg, #75c66a, #b5e565);
+      border-radius: 99px;
+      transform: rotate(18deg);
+      transform-origin: top;
+      opacity: 0;
+      transition: height .08s linear, opacity .08s linear;
+    }
+
+    .pouring .tea-stream { height: 210px; opacity: .9; }
+
+    .cup-zone {
+      height: 100%;
+      min-height: 280px;
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+
+    .cup-wrap {
+      position: relative;
+      width: min(300px, 70vw);
+      height: min(330px, 58vh);
+      min-height: 250px;
+      display: grid;
+      place-items: end center;
+    }
+
+    .cup {
+      position: relative;
+      width: var(--cup-w, 190px);
+      height: var(--cup-h, 220px);
+      clip-path: polygon(var(--top-inset, 3%) 0, calc(100% - var(--top-inset, 3%)) 0, calc(100% - var(--bottom-inset, 14%)) 100%, var(--bottom-inset, 14%) 100%);
+      background: linear-gradient(90deg, #fdfdfd, #e6f5ff 55%, #ffffff);
+      border: 6px solid #223047;
+      border-top-width: 8px;
+      overflow: hidden;
+      box-shadow: inset -16px 0 0 rgba(78, 168, 255, .12), 0 14px 0 rgba(34,48,71,.1);
+    }
+
+    .tea-fill {
+      position: absolute;
+      inset: auto 0 0;
+      height: 0;
+      background: linear-gradient(180deg, #b5e565, #49ad59);
+      transition: height .05s linear;
+    }
+
+    .foam {
+      position: absolute;
+      left: 8%;
+      right: 8%;
+      bottom: calc(var(--fill, 0) * 1%);
+      height: 16px;
+      background: rgba(255, 255, 255, .55);
+      border-radius: 50%;
+      transform: translateY(8px);
+    }
+
+    .target-line {
+      position: absolute;
+      left: -12px;
+      right: -12px;
+      bottom: calc(var(--target, 84) * 1%);
+      border-top: 5px dashed var(--pink);
+      z-index: 3;
+    }
+
+    .target-line::after {
+      content: "STOP";
+      position: absolute;
+      right: -60px;
+      top: -17px;
+      padding: 4px 7px;
+      border-radius: 7px;
+      color: #fff;
+      background: var(--pink);
+      font-size: .75rem;
+      font-weight: 1000;
+    }
+
+    .cup-face {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 72px;
+      height: 42px;
+      z-index: 4;
+    }
+
+    .cup-face::before,
+    .cup-face::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      width: 14px;
+      height: 18px;
+      border-radius: 50%;
+      background: #223047;
+    }
+
+    .cup-face::before { left: 6px; }
+    .cup-face::after { right: 6px; }
+
+    .cup-mouth {
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      width: 32px;
+      height: 16px;
+      border-bottom: 5px solid #223047;
+      border-radius: 0 0 999px 999px;
+      transform: translateX(-50%);
+    }
+
+    .lane-game {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      padding: 14px;
+      gap: 12px;
+      background: linear-gradient(180deg, #fffaf0, #e9fbff);
+    }
+
+    .mission {
+      min-height: 58px;
+      border-radius: 8px;
+      background: #fff;
+      border: 2px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      font-weight: 1000;
+      font-size: clamp(1rem, 3vw, 1.3rem);
+      text-align: center;
+      box-shadow: 0 5px 0 rgba(34,48,71,.08);
+    }
+
+    .mission-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: var(--sun);
+      font-size: 1.6rem;
+    }
+
+    .lane-stage {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.8), rgba(255,255,255,.3)),
+        repeating-linear-gradient(-18deg, rgba(34,48,71,.05) 0 16px, transparent 16px 36px);
+      border: 2px solid rgba(34,48,71,.08);
+    }
+
+    .belt {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 54%;
+      height: 92px;
+      transform: translateY(-50%);
+      background: #6a7890;
+      border-top: 8px solid #223047;
+      border-bottom: 8px solid #223047;
+      box-shadow: inset 0 18px 0 rgba(255,255,255,.08);
+    }
+
+    .belt::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(90deg, transparent 0 36px, rgba(255,255,255,.18) 36px 44px);
+      animation: beltMove .55s linear infinite;
+    }
+
+    @keyframes beltMove {
+      from { background-position: 0 0; }
+      to { background-position: 44px 0; }
+    }
+
+    .sort-bin {
+      position: absolute;
+      left: 50%;
+      top: 9%;
+      width: min(180px, 40vw);
+      height: 84px;
+      transform: translateX(-50%);
+      border-radius: 8px;
+      background: linear-gradient(180deg, #6be3c2, #2db18f);
+      border: 5px solid #223047;
+      box-shadow: 0 9px 0 rgba(34,48,71,.12);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 1000;
+    }
+
+    .sort-bin::before {
+      content: "";
+      position: absolute;
+      left: 12%;
+      right: 12%;
+      top: -16px;
+      height: 20px;
+      border-radius: 999px;
+      background: #223047;
+    }
+
+    .lane-item {
+      position: absolute;
+      width: 70px;
+      height: 70px;
+      left: 100%;
+      top: calc(54% - 35px);
+      display: grid;
+      place-items: center;
+      border: 5px solid #223047;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 8px 0 rgba(34,48,71,.12);
+      font-size: 2.15rem;
+      font-weight: 1000;
+      touch-action: none;
+      transition: transform .1s ease;
+    }
+
+    .lane-item.pickable { outline: 5px solid rgba(255,196,61,.45); }
+    .lane-item.taken { animation: takeUp .24s ease forwards; }
+
+    @keyframes takeUp {
+      to { transform: translateY(-160px) rotate(-10deg) scale(.82); opacity: 0; }
+    }
+
+    .dance-game {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, #27314f 0%, #151b2d 72%),
+        radial-gradient(circle at 50% 10%, rgba(255,196,61,.35), transparent 35%);
+    }
+
+    .stage-floor {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 32%;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.08), transparent),
+        repeating-linear-gradient(90deg, #384367 0 38px, #2d3657 38px 76px);
+      border-top: 5px solid rgba(255,255,255,.18);
+      transform: perspective(460px) rotateX(44deg);
+      transform-origin: bottom;
+    }
+
+    .dance-lights {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 14% 12%, rgba(255, 95, 145, .45), transparent 13%),
+        radial-gradient(circle at 86% 14%, rgba(78, 168, 255, .42), transparent 13%),
+        radial-gradient(circle at 50% 4%, rgba(255, 196, 61, .34), transparent 11%);
+      opacity: .9;
+    }
+
+    .spotlight {
+      position: absolute;
+      width: var(--spot, 168px);
+      height: var(--spot, 168px);
+      border-radius: 50%;
+      left: calc(var(--spot-x, 50) * 1%);
+      top: calc(var(--spot-y, 48) * 1%);
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(255, 245, 153, .9) 0 24%, rgba(255, 245, 153, .46) 42%, rgba(255, 245, 153, .12) 65%, transparent 72%);
+      mix-blend-mode: screen;
+      filter: blur(.5px);
+    }
+
+    .dancer {
+      position: absolute;
+      left: calc(var(--char-x, 50) * 1%);
+      top: calc(var(--char-y, 53) * 1%);
+      width: 128px;
+      height: 178px;
+      transform: translate(-50%, -50%) rotate(var(--tilt, 0deg));
+      transform-origin: 50% 88%;
+      transition: transform .08s linear;
+    }
+
+    .head {
+      position: absolute;
+      left: 36px;
+      top: 10px;
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: #ffca8b;
+      border: 5px solid #11192c;
+      z-index: 3;
+    }
+
+    .hair {
+      position: absolute;
+      left: 29px;
+      top: 3px;
+      width: 72px;
+      height: 36px;
+      border-radius: 999px 999px 30px 30px;
+      background: #4b2b3d;
+      border: 5px solid #11192c;
+      z-index: 4;
+    }
+
+    .eye {
+      position: absolute;
+      top: 31px;
+      width: 8px;
+      height: 11px;
+      border-radius: 50%;
+      background: #11192c;
+      z-index: 5;
+    }
+
+    .eye.left { left: 52px; }
+    .eye.right { left: 73px; }
+
+    .body {
+      position: absolute;
+      left: 39px;
+      top: 67px;
+      width: 52px;
+      height: 72px;
+      border-radius: 18px 18px 14px 14px;
+      background: linear-gradient(180deg, #ff5f91, #8f6bff);
+      border: 5px solid #11192c;
+      z-index: 2;
+    }
+
+    .arm,
+    .leg {
+      position: absolute;
+      background: #ffca8b;
+      border: 5px solid #11192c;
+      border-radius: 999px;
+      transform-origin: 50% 10%;
+      z-index: 1;
+    }
+
+    .arm { width: 22px; height: 78px; top: 72px; }
+    .arm.left { left: 22px; transform: rotate(var(--arm-l, 32deg)); }
+    .arm.right { right: 22px; transform: rotate(var(--arm-r, -32deg)); }
+    .leg { width: 24px; height: 76px; top: 126px; }
+    .leg.left { left: 43px; transform: rotate(var(--leg-l, 12deg)); }
+    .leg.right { right: 43px; transform: rotate(var(--leg-r, -12deg)); }
+
+    .judgement {
+      position: absolute;
+      left: 50%;
+      top: 18%;
+      transform: translateX(-50%);
+      color: #fff;
+      text-shadow: 0 4px 0 rgba(0,0,0,.2);
+      font-size: clamp(2rem, 8vw, 4.4rem);
+      font-weight: 1000;
+      pointer-events: none;
+      animation: judge .55s ease both;
+    }
+
+    @keyframes judge {
+      0% { opacity: 0; transform: translate(-50%, 14px) scale(.8); }
+      22%, 78% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -16px) scale(.96); }
+    }
+
+    .pulse-ring {
+      position: absolute;
+      left: calc(var(--char-x, 50) * 1%);
+      top: calc(var(--char-y, 53) * 1%);
+      width: 170px;
+      height: 170px;
+      border: 6px solid rgba(255,255,255,.8);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      animation: pulse 1s ease-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes pulse {
+      from { opacity: .8; transform: translate(-50%, -50%) scale(.45); }
+      to { opacity: 0; transform: translate(-50%, -50%) scale(1.15); }
+    }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 760px) {
+      body { overflow: auto; }
+
+      .app {
+        min-height: 100dvh;
+        padding-inline: 10px;
+      }
+
+      .topbar {
+        align-items: flex-start;
+      }
+
+      .hud .pill {
+        min-width: 72px;
+        height: 38px;
+        padding: 0 8px;
+      }
+
+      .hero {
+        grid-template-columns: 1fr;
+      }
+
+      .mascot-stage {
+        min-height: 188px;
+      }
+
+      .select-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .game-card {
+        min-height: 146px;
+        grid-template-columns: 96px 1fr;
+        grid-template-rows: auto auto auto;
+        align-items: center;
+      }
+
+      .game-card .card-art {
+        grid-row: 1 / 4;
+        height: 98px;
+      }
+
+      .game-card .card-art svg {
+        width: 96px;
+        height: 86px;
+      }
+
+      .tea-game {
+        grid-template-columns: 1fr;
+        grid-template-rows: .8fr 1.1fr;
+        gap: 0;
+        padding: 10px;
+      }
+
+      .kettle-zone,
+      .cup-zone {
+        min-height: 170px;
+      }
+
+      .kettle {
+        width: min(220px, 62vw);
+        height: min(190px, 48vw);
+      }
+
+      .cup-wrap {
+        height: min(310px, 46vh);
+      }
+
+      .target-line::after {
+        right: -46px;
+        font-size: .64rem;
+      }
+
+      .guide {
+        font-size: .78rem;
+        line-height: 1.35;
+      }
+
+      .lane-item {
+        width: 62px;
+        height: 62px;
+        top: calc(56% - 31px);
+      }
+
+      .belt { top: 56%; height: 84px; }
+
+      .sort-bin { top: 11%; height: 74px; }
+
+      .dancer {
+        width: 106px;
+        height: 150px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 64 64">
+            <path d="M17 26c0-11 30-11 30 0v12c0 12-30 12-30 0Z" fill="#fff" stroke="#223047" stroke-width="5"/>
+            <path d="M23 29h18" stroke="#223047" stroke-width="5" stroke-linecap="round"/>
+            <circle cx="25" cy="39" r="4" fill="#223047"/>
+            <circle cx="39" cy="39" r="4" fill="#223047"/>
+          </svg>
+        </div>
+        <div>
+          <h1>ぽちっとミニゲームパーク</h1>
+          <p class="subtitle">クリックはタップ、ドラッグはフリック</p>
+        </div>
+      </div>
+      <div class="hud" aria-live="polite">
+        <div class="pill" id="scorePill"><span>SCORE</span><b id="scoreText">0</b></div>
+        <div class="pill" id="timePill"><span>TIME</span><b id="timeText">--</b></div>
+        <button class="icon-btn hidden" id="homeBtn" type="button" aria-label="ゲーム選択へ戻る" title="ゲーム選択へ戻る">
+          <svg viewBox="0 0 24 24"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <section class="screen home active" id="homeScreen" aria-label="ミニゲーム選択">
+        <div class="hero">
+          <div class="hero-copy">
+            <h2>3つの手ざわりで遊ぶ。</h2>
+            <p>注ぐ、見分ける、合わせる。スマホのタップとフリックをマウスで練習する、完全オリジナルのミニゲーム集。</p>
+          </div>
+          <div class="mascot-stage" aria-hidden="true">
+            <svg class="mascot" viewBox="0 0 240 240">
+              <path d="M70 183c-25-9-39-29-35-55 5-32 32-53 67-54 48-2 85 25 88 65 2 32-18 52-48 55-16 2-51-2-72-11Z" fill="#fff" stroke="#223047" stroke-width="8"/>
+              <path d="M76 75c-13-20 4-40 26-29 7 4 11 13 9 29" fill="#6be3c2" stroke="#223047" stroke-width="8"/>
+              <path d="M133 74c5-24 30-27 39-7 7 17-6 31-28 33" fill="#ffc43d" stroke="#223047" stroke-width="8"/>
+              <circle cx="92" cy="130" r="10" fill="#223047"/>
+              <circle cx="146" cy="130" r="10" fill="#223047"/>
+              <path d="M104 158c12 10 28 10 40 0" fill="none" stroke="#223047" stroke-width="8" stroke-linecap="round"/>
+              <path d="M54 157 28 174M181 157l28 14" stroke="#223047" stroke-width="8" stroke-linecap="round"/>
+              <path d="M84 194 74 218M143 195l13 22" stroke="#223047" stroke-width="8" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
+        <div class="select-grid" id="gameSelect"></div>
+      </section>
+
+      <section class="screen" id="playScreen" aria-label="プレイ画面">
+        <div class="play-shell">
+          <div class="play-header">
+            <div class="play-title">
+              <div class="badge" id="gameBadge">A</div>
+              <strong id="gameTitle">ゲーム</strong>
+            </div>
+            <button class="secondary-btn" id="retryTopBtn" type="button">リトライ</button>
+          </div>
+          <div class="play-area" id="playArea"></div>
+          <div class="guide" id="guideText"></div>
+        </div>
+      </section>
+
+      <section class="screen result-screen" id="resultScreen" aria-label="結果">
+        <div class="result-panel">
+          <h2 id="resultTitle">結果</h2>
+          <div class="result-score" id="resultScore">0</div>
+          <p id="resultDetail"></p>
+          <div class="result-actions">
+            <button class="primary-btn" id="retryBtn" type="button">もう一度</button>
+            <button class="secondary-btn" id="selectBtn" type="button">ゲーム選択</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const $ = (selector, root = document) => root.querySelector(selector);
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+      const rand = (min, max) => min + Math.random() * (max - min);
+      const choice = (items) => items[Math.floor(Math.random() * items.length)];
+
+      const state = {
+        current: null,
+        instance: null,
+        score: 0,
+        timeLeft: 0,
+        running: false,
+        lastTick: 0,
+        raf: 0,
+      };
+
+      const els = {
+        score: $("#scoreText"),
+        time: $("#timeText"),
+        scorePill: $("#scorePill"),
+        timePill: $("#timePill"),
+        homeBtn: $("#homeBtn"),
+        home: $("#homeScreen"),
+        play: $("#playScreen"),
+        result: $("#resultScreen"),
+        select: $("#gameSelect"),
+        playArea: $("#playArea"),
+        guide: $("#guideText"),
+        badge: $("#gameBadge"),
+        title: $("#gameTitle"),
+        resultTitle: $("#resultTitle"),
+        resultScore: $("#resultScore"),
+        resultDetail: $("#resultDetail"),
+        retryBtn: $("#retryBtn"),
+        retryTopBtn: $("#retryTopBtn"),
+        selectBtn: $("#selectBtn"),
+      };
+
+      const games = [];
+      const registerGame = (game) => games.push(game);
+
+      function setScreen(name) {
+        [els.home, els.play, els.result].forEach((el) => el.classList.remove("active"));
+        if (name === "home") els.home.classList.add("active");
+        if (name === "play") els.play.classList.add("active");
+        if (name === "result") els.result.classList.add("active");
+        els.homeBtn.classList.toggle("hidden", name === "home");
+        els.scorePill.classList.toggle("hidden", name === "home");
+        els.timePill.classList.toggle("hidden", name === "home" || name === "result");
+      }
+
+      function updateHud() {
+        els.score.textContent = Math.round(state.score).toString();
+        els.time.textContent = state.running ? Math.max(0, Math.ceil(state.timeLeft)).toString() : "--";
+      }
+
+      function toast(text, tone = "dark") {
+        const node = document.createElement("div");
+        node.className = "toast";
+        node.textContent = text;
+        if (tone === "good") node.style.background = "rgba(45, 177, 143, .94)";
+        if (tone === "bad") node.style.background = "rgba(255, 107, 74, .94)";
+        els.playArea.appendChild(node);
+        node.addEventListener("animationend", () => node.remove(), { once: true });
+      }
+
+      function stopGame(showResult = true) {
+        if (!state.current) return;
+        state.running = false;
+        cancelAnimationFrame(state.raf);
+        const summary = state.instance && state.instance.finish ? state.instance.finish() : "";
+        updateHud();
+        if (showResult) {
+          els.resultTitle.textContent = state.current.title;
+          els.resultScore.textContent = `${Math.round(state.score)}点`;
+          els.resultDetail.textContent = summary || state.current.resultText || "プレイ完了";
+          setScreen("result");
+        }
+      }
+
+      function cleanupGame() {
+        cancelAnimationFrame(state.raf);
+        if (state.instance && state.instance.destroy) state.instance.destroy();
+        state.instance = null;
+        state.running = false;
+        els.playArea.replaceChildren();
+        document.onkeydown = null;
+        document.onkeyup = null;
+      }
+
+      function startGame(id) {
+        cleanupGame();
+        const game = games.find((g) => g.id === id);
+        if (!game) return;
+        state.current = game;
+        state.score = 0;
+        state.timeLeft = game.duration;
+        state.running = true;
+        state.lastTick = performance.now();
+        els.badge.textContent = game.badge;
+        els.badge.style.background = game.color;
+        els.title.textContent = game.title;
+        els.guide.innerHTML = game.guide;
+        state.instance = game.init({
+          area: els.playArea,
+          addScore(points) {
+            state.score = Math.max(-999, state.score + points);
+            updateHud();
+          },
+          setScore(points) {
+            state.score = points;
+            updateHud();
+          },
+          toast,
+          end: () => stopGame(true),
+          isRunning: () => state.running,
+        });
+        updateHud();
+        setScreen("play");
+        state.raf = requestAnimationFrame(tick);
+      }
+
+      function tick(now) {
+        if (!state.running) return;
+        const dt = Math.min(.08, (now - state.lastTick) / 1000);
+        state.lastTick = now;
+        state.timeLeft -= dt;
+        if (state.instance && state.instance.update) state.instance.update(dt, now);
+        if (state.timeLeft <= 0) {
+          state.timeLeft = 0;
+          stopGame(true);
+          return;
+        }
+        updateHud();
+        state.raf = requestAnimationFrame(tick);
+      }
+
+      function renderSelect() {
+        els.select.replaceChildren(...games.map((game) => {
+          const btn = document.createElement("button");
+          btn.className = "game-card";
+          btn.type = "button";
+          btn.dataset.game = game.id;
+          btn.innerHTML = `
+            <div class="card-art">${game.art}</div>
+            <h3>${game.badge}: ${game.title}</h3>
+            <p>${game.description}</p>
+            <span class="card-chip">${game.chip}</span>
+          `;
+          btn.addEventListener("click", () => startGame(game.id));
+          return btn;
+        }));
+      }
+
+      function pointerPoint(event, root) {
+        const rect = root.getBoundingClientRect();
+        return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      }
+
+      function teaGame() {
+        const cups = [
+          { w: 174, h: 224, top: "2%", bottom: "17%", target: 82, speed: 34, name: "ほそ湯呑み" },
+          { w: 218, h: 194, top: "7%", bottom: "10%", target: 76, speed: 27, name: "まる湯呑み" },
+          { w: 190, h: 246, top: "0%", bottom: "22%", target: 87, speed: 31, name: "たか湯呑み" },
+          { w: 236, h: 170, top: "10%", bottom: "5%", target: 70, speed: 24, name: "ひら湯呑み" },
+        ];
+        return {
+          id: "tea",
+          badge: "A",
+          color: "#35c7a3",
+          title: "お茶注ぎ",
+          duration: 45,
+          description: "長押しで注いで、満タンラインの直前で離す。",
+          chip: "ゲージ制御",
+          guide: `<span>長押しで注ぐ、離して判定</span><span class="kbd">Space</span>`,
+          resultText: "正確に止めた湯呑みが多いほど高得点。",
+          art: `<svg viewBox="0 0 150 80" aria-hidden="true"><path d="M23 52h65c10 0 18-8 18-18S98 16 88 16H23Z" fill="#ffc43d" stroke="#223047" stroke-width="6"/><path d="M105 28h27c8 0 9 15 0 17h-18" fill="none" stroke="#223047" stroke-width="6"/><path d="M55 55v18" stroke="#6dbb43" stroke-width="9" stroke-linecap="round"/><path d="M63 72h44l-8-42H72Z" fill="#fff" stroke="#223047" stroke-width="6"/><path d="M75 48h22" stroke="#ff5f91" stroke-width="5" stroke-dasharray="5 5"/></svg>`,
+          init(ctx) {
+            let fill = 0;
+            let pouring = false;
+            let total = 0;
+            let perfect = 0;
+            let overflowed = false;
+            let cup = choice(cups);
+            const root = document.createElement("div");
+            root.className = "tea-game";
+            root.innerHTML = `
+              <div class="kettle-zone">
+                <div class="kettle" aria-hidden="true">
+                  <div class="kettle-handle"></div><div class="kettle-body"></div><div class="kettle-lid"></div><div class="kettle-spout"></div><div class="tea-stream"></div>
+                </div>
+              </div>
+              <div class="cup-zone">
+                <div class="cup-wrap">
+                  <div class="cup" id="cup">
+                    <div class="tea-fill"></div><div class="foam"></div><div class="target-line"></div><div class="cup-face"><div class="cup-mouth"></div></div>
+                  </div>
+                </div>
+              </div>
+            `;
+            ctx.area.appendChild(root);
+            const cupEl = $("#cup", root);
+            const fillEl = $(".tea-fill", root);
+
+            function applyCup() {
+              cup = choice(cups);
+              fill = 0;
+              overflowed = false;
+              cupEl.style.setProperty("--cup-w", `${cup.w}px`);
+              cupEl.style.setProperty("--cup-h", `${cup.h}px`);
+              cupEl.style.setProperty("--top-inset", cup.top);
+              cupEl.style.setProperty("--bottom-inset", cup.bottom);
+              cupEl.style.setProperty("--target", cup.target);
+              cupEl.style.setProperty("--fill", "0");
+              fillEl.style.height = "0%";
+              ctx.toast(cup.name, "good");
+            }
+
+            function setPour(next) {
+              pouring = next;
+              root.classList.toggle("pouring", pouring);
+            }
+
+            function judge() {
+              if (!ctx.isRunning() || fill <= 0) return;
+              const diff = cup.target - fill;
+              total += 1;
+              let text = "Miss";
+              let tone = "bad";
+              let points = -12;
+              if (fill > 100) {
+                text = "あふれた!";
+                points = -25;
+              } else if (diff >= 0 && diff <= 3) {
+                text = "Perfect";
+                points = 110;
+                tone = "good";
+                perfect += 1;
+              } else if (diff >= 0 && diff <= 9) {
+                text = "Good";
+                points = 65;
+                tone = "good";
+              } else if (diff > 9) {
+                text = "少ない";
+                points = Math.max(5, 35 - diff);
+              }
+              ctx.addScore(points);
+              ctx.toast(`${text} ${points > 0 ? "+" : ""}${Math.round(points)}`, tone);
+              window.setTimeout(applyCup, 460);
+            }
+
+            function down(event) {
+              event.preventDefault();
+              if (!ctx.isRunning()) return;
+              setPour(true);
+            }
+
+            function up(event) {
+              event.preventDefault();
+              if (!pouring) return;
+              setPour(false);
+              judge();
+            }
+
+            root.addEventListener("pointerdown", down);
+            window.addEventListener("pointerup", up);
+            document.onkeydown = (event) => {
+              if (event.code === "Space") {
+                event.preventDefault();
+                setPour(true);
+              }
+            };
+            document.onkeyup = (event) => {
+              if (event.code === "Space") {
+                event.preventDefault();
+                setPour(false);
+                judge();
+              }
+            };
+
+            applyCup();
+            return {
+              update(dt) {
+                if (!pouring) return;
+                fill += cup.speed * dt;
+                cupEl.style.setProperty("--fill", `${Math.min(106, fill)}`);
+                fillEl.style.height = `${Math.min(112, fill)}%`;
+                if (fill > 103 && !overflowed) {
+                  overflowed = true;
+                  ctx.addScore(-10);
+                  ctx.toast("こぼれ中 -10", "bad");
+                }
+              },
+              finish() {
+                return `${total}杯チャレンジ / Perfect ${perfect}杯`;
+              },
+              destroy() {
+                window.removeEventListener("pointerup", up);
+              }
+            };
+          }
+        };
+      }
+
+      function laneGame() {
+        const categories = [
+          { key: "star", label: "星のしるし", icon: "★", color: "#ffc43d" },
+          { key: "leaf", label: "葉っぱ", icon: "葉", color: "#6dbb43" },
+          { key: "drop", label: "しずく", icon: "滴", color: "#4ea8ff" },
+        ];
+        const symbols = [
+          { cat: "star", text: "★", bg: "#fff1a7" },
+          { cat: "star", text: "☆", bg: "#fff8c9" },
+          { cat: "leaf", text: "葉", bg: "#dff7cc" },
+          { cat: "leaf", text: "芽", bg: "#e9ffd9" },
+          { cat: "drop", text: "滴", bg: "#dff3ff" },
+          { cat: "drop", text: "雨", bg: "#e8f7ff" },
+          { cat: "none", text: "石", bg: "#e6e7ec" },
+          { cat: "none", text: "雲", bg: "#ffffff" },
+        ];
+        return {
+          id: "lane",
+          badge: "B",
+          color: "#4ea8ff",
+          title: "回転レーン仕分け",
+          duration: 40,
+          description: "お題に合うアイテムだけ上フリックで取る。",
+          chip: "スワイプ仕分け",
+          guide: `<span>上フリックで取る、不要品は放置</span><span class="kbd">↑</span>`,
+          resultText: "必要なものだけ拾うほど高得点。",
+          art: `<svg viewBox="0 0 150 80" aria-hidden="true"><path d="M8 48h134" stroke="#223047" stroke-width="16" stroke-linecap="round"/><path d="M12 48h126" stroke="#6a7890" stroke-width="10" stroke-dasharray="14 10"/><rect x="59" y="4" width="35" height="35" rx="7" fill="#ffc43d" stroke="#223047" stroke-width="6"/><path d="m76 5 0 26M66 17l10-12 10 12" fill="none" stroke="#223047" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><rect x="18" y="30" width="33" height="33" rx="7" fill="#fff" stroke="#223047" stroke-width="6"/><text x="34" y="54" text-anchor="middle" font-size="24" font-weight="900" fill="#223047">★</text></svg>`,
+          init(ctx) {
+            let target = choice(categories);
+            let spawn = 0;
+            let speed = 185;
+            let hits = 0;
+            let mistakes = 0;
+            const items = new Set();
+            const root = document.createElement("div");
+            root.className = "lane-game";
+            root.innerHTML = `
+              <div class="mission"><span class="mission-icon"></span><span class="mission-text"></span></div>
+              <div class="lane-stage">
+                <div class="sort-bin">ここへフリック</div>
+                <div class="belt"></div>
+              </div>
+            `;
+            ctx.area.appendChild(root);
+            const missionIcon = $(".mission-icon", root);
+            const missionText = $(".mission-text", root);
+            const stage = $(".lane-stage", root);
+            let activeEl = null;
+            let activeStartY = 0;
+
+            function itemFromPoint(x, y) {
+              const el = document.elementFromPoint(x, y);
+              return el && el.closest ? el.closest(".lane-item") : null;
+            }
+
+            function startFlick(x, y) {
+              const el = itemFromPoint(x, y);
+              if (!el || !stage.contains(el) || el.dataset.alive !== "1") return;
+              activeEl = el;
+              activeStartY = y;
+            }
+
+            function endFlick(y) {
+              if (activeEl && activeStartY - y > 28) take(activeEl);
+              activeEl = null;
+            }
+
+            function setMission() {
+              target = choice(categories);
+              missionIcon.textContent = target.icon;
+              missionIcon.style.background = target.color;
+              missionText.textContent = `${target.label}だけ取る`;
+            }
+
+            function spawnItem() {
+              const data = choice(symbols);
+              const el = document.createElement("div");
+              el.className = "lane-item";
+              el.textContent = data.text;
+              el.style.background = data.bg;
+              el.style.left = `${stage.clientWidth + 12}px`;
+              el.dataset.x = `${stage.clientWidth + 12}`;
+              el.dataset.cat = data.cat;
+              el.dataset.alive = "1";
+              el.classList.toggle("pickable", data.cat === target.key);
+              el.addEventListener("pointerdown", (event) => {
+                startFlick(event.clientX, event.clientY);
+                el.setPointerCapture(event.pointerId);
+              });
+              stage.appendChild(el);
+              items.add(el);
+            }
+
+            function take(el) {
+              if (!ctx.isRunning() || el.dataset.alive !== "1") return;
+              el.dataset.alive = "0";
+              el.classList.add("taken");
+              if (el.dataset.cat === target.key) {
+                hits += 1;
+                ctx.addScore(70);
+                ctx.toast("ナイス +70", "good");
+                if (hits % 5 === 0) setMission();
+              } else {
+                mistakes += 1;
+                ctx.addScore(-45);
+                ctx.toast("ちがう! -45", "bad");
+              }
+              window.setTimeout(() => {
+                items.delete(el);
+                el.remove();
+              }, 260);
+            }
+
+            document.onkeydown = (event) => {
+              if (event.key !== "ArrowUp") return;
+              event.preventDefault();
+              const candidates = [...items]
+                .filter((el) => el.dataset.alive === "1")
+                .map((el) => ({ el, x: Number(el.dataset.x) }))
+                .filter((item) => item.x > stage.clientWidth * .28 && item.x < stage.clientWidth * .72)
+                .sort((a, b) => Math.abs(a.x - stage.clientWidth * .5) - Math.abs(b.x - stage.clientWidth * .5));
+              if (candidates[0]) take(candidates[0].el);
+            };
+            stage.addEventListener("pointerdown", (event) => startFlick(event.clientX, event.clientY));
+            stage.addEventListener("mousedown", (event) => startFlick(event.clientX, event.clientY));
+            stage.addEventListener("touchstart", (event) => {
+              const touch = event.changedTouches[0];
+              if (touch) startFlick(touch.clientX, touch.clientY);
+            }, { passive: true });
+            window.addEventListener("pointerup", onPointerUp);
+            window.addEventListener("mouseup", onMouseUp);
+            window.addEventListener("touchend", onTouchEnd);
+
+            function onPointerUp(event) {
+              endFlick(event.clientY);
+            }
+
+            function onMouseUp(event) {
+              endFlick(event.clientY);
+            }
+
+            function onTouchEnd(event) {
+              const touch = event.changedTouches[0];
+              if (touch) endFlick(touch.clientY);
+            }
+
+            setMission();
+            return {
+              update(dt) {
+                spawn -= dt;
+                speed += dt * 7;
+                if (spawn <= 0) {
+                  spawnItem();
+                  spawn = rand(.62, 1.08);
+                }
+                const width = stage.clientWidth;
+                items.forEach((el) => {
+                  if (el.dataset.alive !== "1") return;
+                  const x = Number(el.dataset.x) - speed * dt;
+                  el.dataset.x = `${x}`;
+                  el.style.left = `${x}px`;
+                  if (x < -84) {
+                    if (el.dataset.cat === target.key) {
+                      ctx.addScore(-18);
+                      ctx.toast("見逃し -18", "bad");
+                    }
+                    items.delete(el);
+                    el.remove();
+                  } else if (width > 0) {
+                    el.style.transform = `rotate(${Math.sin(x / 28) * 7}deg)`;
+                  }
+                });
+              },
+              finish() {
+                return `回収 ${hits}個 / ミス ${mistakes}回`;
+              },
+              destroy() {
+                window.removeEventListener("pointerup", onPointerUp);
+                window.removeEventListener("mouseup", onMouseUp);
+                window.removeEventListener("touchend", onTouchEnd);
+                items.forEach((el) => el.remove());
+                items.clear();
+              }
+            };
+          }
+        };
+      }
+
+      function danceGame() {
+        return {
+          id: "dance",
+          badge: "C",
+          color: "#ff5f91",
+          title: "スポットライト・ダンス",
+          duration: 45,
+          description: "キャラとスポットライトが重なった瞬間にタップ。",
+          chip: "一点タイミング",
+          guide: `<span>重なった瞬間にタップ</span><span class="kbd">Space</span>`,
+          resultText: "中心が近いほど Perfect。",
+          art: `<svg viewBox="0 0 150 80" aria-hidden="true"><path d="M6 74h138" stroke="#223047" stroke-width="8" stroke-linecap="round"/><circle cx="76" cy="39" r="31" fill="#fff199" stroke="#223047" stroke-width="6"/><path d="M66 37h20M70 50c6 5 13 5 19 0" stroke="#223047" stroke-width="5" stroke-linecap="round"/><path d="M52 64 40 48M100 64l13-16" stroke="#ff5f91" stroke-width="8" stroke-linecap="round"/></svg>`,
+          init(ctx) {
+            let elapsed = 0;
+            let taps = 0;
+            let perfect = 0;
+            let good = 0;
+            let miss = 0;
+            let canScore = true;
+            const root = document.createElement("div");
+            root.className = "dance-game";
+            root.innerHTML = `
+              <div class="dance-lights"></div>
+              <div class="spotlight"></div>
+              <div class="pulse-ring"></div>
+              <div class="dancer" aria-hidden="true">
+                <div class="hair"></div><div class="head"></div><div class="eye left"></div><div class="eye right"></div>
+                <div class="arm left"></div><div class="arm right"></div><div class="body"></div><div class="leg left"></div><div class="leg right"></div>
+              </div>
+              <div class="stage-floor"></div>
+            `;
+            ctx.area.appendChild(root);
+            const dancer = $(".dancer", root);
+            const spotlight = $(".spotlight", root);
+
+            function positions() {
+              const charX = 50 + Math.sin(elapsed * 1.7) * 20 + Math.sin(elapsed * 3.1) * 5;
+              const charY = 54 + Math.sin(elapsed * 2.35) * 8;
+              const spotX = 50 + Math.sin(elapsed * 1.62 + 1.1) * 27;
+              const spotY = 51 + Math.cos(elapsed * 2.05 + .6) * 13;
+              return { charX, charY, spotX, spotY };
+            }
+
+            function judge() {
+              if (!ctx.isRunning() || !canScore) return;
+              canScore = false;
+              window.setTimeout(() => { canScore = true; }, 260);
+              taps += 1;
+              const p = positions();
+              const dx = p.charX - p.spotX;
+              const dy = p.charY - p.spotY;
+              const dist = Math.hypot(dx, dy);
+              let text = "Miss";
+              let points = -12;
+              let color = "#ff6b4a";
+              if (dist < 8) {
+                text = "Perfect";
+                points = 120;
+                color = "#ffc43d";
+                perfect += 1;
+              } else if (dist < 16) {
+                text = "Good";
+                points = 65;
+                color = "#6be3c2";
+                good += 1;
+              } else {
+                miss += 1;
+              }
+              ctx.addScore(points);
+              const label = document.createElement("div");
+              label.className = "judgement";
+              label.textContent = text;
+              label.style.color = color;
+              root.appendChild(label);
+              label.addEventListener("animationend", () => label.remove(), { once: true });
+            }
+
+            root.addEventListener("pointerdown", judge);
+            document.onkeydown = (event) => {
+              if (event.code === "Space") {
+                event.preventDefault();
+                judge();
+              }
+            };
+
+            return {
+              update(dt) {
+                elapsed += dt;
+                const p = positions();
+                root.style.setProperty("--char-x", p.charX.toFixed(2));
+                root.style.setProperty("--char-y", p.charY.toFixed(2));
+                root.style.setProperty("--spot-x", p.spotX.toFixed(2));
+                root.style.setProperty("--spot-y", p.spotY.toFixed(2));
+                root.style.setProperty("--tilt", `${(Math.sin(elapsed * 5.1) * 7).toFixed(2)}deg`);
+                dancer.style.setProperty("--arm-l", `${30 + Math.sin(elapsed * 6) * 30}deg`);
+                dancer.style.setProperty("--arm-r", `${-30 + Math.cos(elapsed * 5.7) * 30}deg`);
+                dancer.style.setProperty("--leg-l", `${9 + Math.cos(elapsed * 5.2) * 18}deg`);
+                dancer.style.setProperty("--leg-r", `${-9 + Math.sin(elapsed * 5.4) * 18}deg`);
+                const close = Math.hypot(p.charX - p.spotX, p.charY - p.spotY);
+                spotlight.style.filter = close < 12 ? "brightness(1.35) blur(.5px)" : "blur(.5px)";
+              },
+              finish() {
+                return `Perfect ${perfect} / Good ${good} / Miss ${miss} / タップ ${taps}`;
+              },
+              destroy() {}
+            };
+          }
+        };
+      }
+
+      registerGame(teaGame());
+      registerGame(laneGame());
+      registerGame(danceGame());
+      renderSelect();
+      setScreen("home");
+      updateHud();
+
+      els.homeBtn.addEventListener("click", () => {
+        cleanupGame();
+        setScreen("home");
+      });
+      els.retryTopBtn.addEventListener("click", () => state.current && startGame(state.current.id));
+      els.retryBtn.addEventListener("click", () => state.current && startGame(state.current.id));
+      els.selectBtn.addEventListener("click", () => {
+        cleanupGame();
+        setScreen("home");
+      });
+    })();
+  </script>
+</body>
+</html>
