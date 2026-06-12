@@ -797,7 +797,7 @@ function startLoop(){
   lastTs=performance.now();
   const step=ts=>{
     rafId=requestAnimationFrame(step);
-    const dt=Math.min(0.05,(ts-lastTs)/1000);
+    const dt=clamp((ts-lastTs)/1000,0,0.05); // 1フレーム最大50ms: タブ復帰/処理落ちで時間が飛ばない・時計巻き戻りも無害化
     lastTs=ts;
     if(phase==='count')updateCountdown(ts);
     if(phase==='play'){
@@ -1836,8 +1836,11 @@ registerGame({
     }
     const BASS=[87.31,87.31,116.54,98.0];
     // ---- 状態 ----
-    // 曲時間はフレーム積算 (AudioContextがsuspendedでも必ず進む)
-    let now=0,audioAnchor=0;
+    // 曲時間は delta time 積算のみ (コア側で1フレーム最大50msにクランプ済み)。
+    // AudioContext の currentTime には同期しない: audio クロックはタブ非表示中も
+    // 進み続けるため、max() で吸着させると復帰瞬間に曲時間がジャンプして
+    // 全ノーツが LATE MISS になる暴走を起こす。
+    let now=0;
     let beatIdx=0,visIdx=0,kickCount=0;
     let actIdx=0,resolved=0;
     let charFrom={...notes[0].pos},charTo=notes[0].pos,hopStartT=-9,charPos={...notes[0].pos},charLift=0;
@@ -1951,7 +1954,6 @@ registerGame({
       hudInfo(){return '♪ のこり '+(total-resolved)},
       update(dt){
         now+=dt;
-        if(A.ctx&&A.ctx.state==='running')now=Math.max(now,A.now()-audioAnchor);
         tapCd=Math.max(0,tapCd-dt);
         faceT-=dt;if(faceT<=0)face='normal';
         // ビート予約
@@ -2067,7 +2069,7 @@ registerGame({
       },
       onDown(){tap()},
       onKey(code,down){if(down&&(code==='Space'||code==='Enter'))tap()},
-      onResume(){audioAnchor=A.now()-now;A.proximityStart()},
+      onResume(){A.proximityStart()},
       onPause(){A.proximityStop()},
       onTimeUp(){A.proximityStop()},
       finish(){
