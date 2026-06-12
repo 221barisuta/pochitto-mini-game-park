@@ -38,6 +38,14 @@ const APP_CONFIG = {
 - OGPドメイン: `canonicalUrl`とHTML内の`og:url`、`og:image`、canonicalを変更
 - ランキング: `rankingEndpoint`へPOSTを受けるAPIを設定
 
+### ランキングAPI（実装済みバックエンドあり）
+
+[petit-game-park の `ranking-worker/`](https://github.com/221barisuta/petit-game-park/tree/main/ranking-worker)
+（Cloudflare Workers + KV、`POST /score` / `GET /top` の2本）がこのサイトのペイロードを
+そのまま受けられます（`dailyKey: "YYYY-MM-DD"` 形式対応・両サイト共用）。
+デプロイ後、`rankingEndpoint` に `https://pgp-ranking.<あなた>.workers.dev/score` を設定するだけです。
+手順は同ディレクトリの README（3コマンド・約5分）。
+
 ランキングAPIには次のJSONを送ります。未設定・送信失敗時もゲーム結果には影響しません。
 
 ```json
