@@ -1,4 +1,4 @@
-const CACHE_VERSION = "pochitto-v2-20260612-1";
+const CACHE_VERSION = "pochitto-v2-20260612-2";
 const APP_SHELL = [
   "./",
   "./index.html",

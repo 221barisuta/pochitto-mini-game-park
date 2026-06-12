@@ -906,7 +906,7 @@ function showResult(res){
   data.save();
   $('resRecord').classList.toggle('hidden',!isRec);
   $('resBest').textContent='BEST '+Math.max(oldBest,score)+' / MAX COMBO '+session.maxCombo;
-  $('resGoal').textContent=nextGoal(score,oldBest,previous,session.judgments.perfect);
+  $('resGoal').textContent=nextGoal(curDef.id,score,oldBest,previous,session.judgments,res.counts,session.maxCombo);
   // スコアカウントアップ
   const el=$('resScore');
   const dur=800,t0=performance.now();
@@ -928,11 +928,41 @@ function showResult(res){
   lastResult={def:curDef,score,best:Math.max(oldBest,score),isRec,mode:runMode,seed:runSeed,stats:res.stats||[],judgments:{...session.judgments}};
   game=null;
 }
-function nextGoal(score,best,previous,perfects){
-  if(best>score)return `次の目標：自己ベストまであと ${best-score}点`;
-  if(score>previous&&previous>0)return `前回より ${score-previous}点アップ！ 次はさらに+30点`;
-  const rest=3-(perfects%3);
-  return `次の目標：PERFECTをあと${rest}回でボーナス`;
+/* ゲーム別の「次の一手」(必ず何か返す) */
+function gameHint(gameId,j,c,maxCombo){
+  j=j||{};c=c||{};
+  if(gameId==='tea'){
+    if((c.spill||0)>=2)return '0.1秒はやく離して「あふれ」ゼロ';
+    if(!(j.perfect>0))return '金色ゾーンど真ん中で PERFECT を1回';
+    if((c.weak||0)>=2)return '線ぎりぎりまで ねばって GREAT以上';
+    return 'PERFECT をもう1回';
+  }
+  if(gameId==='lane'){
+    if((maxCombo||0)<3)return 'つづけて 3コンボ';
+    if((c.wrong||0)>=2)return 'お題以外はスルーして おてつきゼロ';
+    if(!(j.perfect>0))return '流れてきた直後に取って PERFECT';
+    return 'PERFECT の数を ふやそう';
+  }
+  if(gameId==='spot'){
+    const e=c.early||0,l=c.late||0;
+    if(e+l>0)return e>=l?'少し待って EARLY を GOOD に':'少し早めに押して LATE を GOOD に';
+    if((c.miss||0)>=3)return '光がリングに重なるまで待とう';
+    if(!(j.perfect>0))return 'ど真ん中で PERFECT を1回';
+    return 'PERFECT をもう1回';
+  }
+  return 'PERFECT を1回';
+}
+function nextGoal(gameId,score,best,previous,judgments,counts,maxCombo){
+  const hint=gameHint(gameId,judgments,counts,maxCombo);
+  if(score===0&&best===0){
+    return {tea:'次の目標：まずは1ぱい そそいでみよう',
+            lane:'次の目標：まずは1個 ゲットしてみよう',
+            spot:'次の目標：まずは1回 タイミングを合わせよう'}[gameId]||'次の目標：まずは1個ゲットしよう';
+  }
+  if(score===best&&score>0)return '🤝 ベストタイ！あと1点こえれば新記録';
+  if(best>score)return `自己ベストまであと${best-score}点：${hint}`;
+  if(score>previous&&previous>0)return `🎉 前回より${score-previous}点アップ！次は ${hint}`;
+  return `🎉 新記録！次は ${hint}`;
 }
 function pruneDaily(){
   const keys=Object.keys(data.scores.daily).sort().reverse();
@@ -1515,7 +1545,7 @@ registerGame({
       onPause(){if(pouring){pouring=false;A.pourStop();if(cup)cup.state='ready'}},
       finish(){
         A.pourStop();
-        return {score:ctx.score,stats:[
+        return {score:ctx.score,counts:{...counts},stats:[
           ['⭐ PERFECT',counts.perfect],
           ['✨ GREAT',counts.great],
           ['👍 GOOD',counts.good],
@@ -1602,7 +1632,7 @@ registerGame({
         parts.burst(it.x,BELT_Y-40,5,{col:'#fff',grav:180});
       }else{
         wrong++;ctx.miss();
-        flo.add('おしい！',it.x,BELT_Y-95,'#ffb8c8',18);
+        flo.add('ちがう！',it.x,BELT_Y-95,'#ffb8c8',18,0.6); // 対象位置に短時間だけ
         A.bad();
         parts.burst(it.x,BELT_Y-40,7,{col:'#ff8a8a',grav:280});
       }
@@ -1763,7 +1793,7 @@ registerGame({
         if(down&&(code==='ArrowUp'||code==='Space'||code==='KeyW'))grabNearest(W/2);
       },
       finish(){
-        return {score:ctx.score,stats:[
+        return {score:ctx.score,counts:{got,wrong,missed},stats:[
           ['🍽️ ゲット',got],
           ['❌ おてつき',wrong],
           ['💨 みのがし',missed],
@@ -2074,7 +2104,7 @@ registerGame({
       onTimeUp(){A.proximityStop()},
       finish(){
         A.proximityStop();
-        return {score:ctx.score,stats:[
+        return {score:ctx.score,counts:{...counts},stats:[
           ['⭐ PERFECT',counts.perfect],
           ['✨ GREAT',counts.great],
           ['👍 GOOD',counts.good],
