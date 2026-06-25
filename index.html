@@ -708,7 +708,7 @@ window.addEventListener('resize',resizeCanvas);
 function makeCtx(def){
   const playCount=data.profile.gamePlayCounts[def.id]||0;
   return {
-    W,H,audio:AudioKit,duration:def.duration,rng:makeRng(runSeed),session,
+    W,H,audio:AudioKit,type:def.type,duration:def.duration,rng:makeRng(runSeed),session,
     get score(){return session.score},
     get combo(){return session.combo},
     get fever(){return session.fever},
@@ -740,12 +740,17 @@ function openGame(def,skipHowto=false,mode='free'){
   game=def.create(makeCtx(def));
   if(game.start)game.start({mode,seed:runSeed});
   elapsed=0;lastSec=-1;lastHudScore=null;phase='idle';runStarted=false;pendingResult=null;resultAt=0;
+  const versus=def.type==='versus';
+  $('hudScore').style.display=versus?'none':'';
+  $('hudBest').style.display=versus?'none':'';
+  $('hudTimeBar').style.display=versus?'none':'';
+  $('feverBar').style.display=versus?'none':'';
+  $('hudCombo').style.display=versus?'none':'';
   $('hudScore').textContent='0';
   $('hudBest').textContent='BEST '+bestFor(def,mode);
-  $('hudTimeBar').style.display='';
   $('hudTimeBar').classList.remove('warn');
   $('hudTime').classList.remove('warn');
-  $('hudTime').textContent='⏱ '+def.duration;
+  $('hudTime').textContent=versus?(game.hudInfo?game.hudInfo():''):'⏱ '+def.duration;
   $('feverBar').classList.remove('active');
   startLoop();
   if(skipHowto||data.profile.tutorials[def.id])startCountdown();else showHowto(def);
@@ -769,9 +774,26 @@ function startCountdown(){
   if(curDef&&!data.profile.tutorials[curDef.id]){
     data.profile.tutorials[curDef.id]=true;data.save();track('tutorial_complete',{gameId:curDef.id});
   }
+  if(curDef&&curDef.type==='versus'){
+    startImmediatePlay();
+    return;
+  }
   phase='count';
   countStarted=performance.now();countValue='';
   $('countdown').classList.remove('hidden');
+}
+function startImmediatePlay(ts=performance.now()){
+  $('howto').classList.add('hidden');
+  $('resumeGate').classList.add('hidden');
+  $('countdown').classList.add('hidden');
+  phase='play';lastTs=ts;
+  if(!runStarted){
+    runStarted=true;
+    data.profile.gamePlayCounts[curDef.id]=(data.profile.gamePlayCounts[curDef.id]||0)+1;
+    data.profile.totalPlays++;updateUnlocks();data.save();
+    track('game_start',{gameId:curDef.id,mode:runMode,seed:runSeed});
+  }
+  if(game&&game.onResume)game.onResume();
 }
 function updateCountdown(ts){
   const age=(ts-countStarted)/1000;
@@ -802,9 +824,9 @@ function startLoop(){
     if(phase==='count')updateCountdown(ts);
     if(phase==='play'){
       elapsed+=dt;
-      session.update(dt,elapsed);
+      if(curDef.duration)session.update(dt,elapsed);
       game.update(dt);
-      if(elapsed>=curDef.duration)timeUp();
+      if(curDef.duration&&elapsed>=curDef.duration)timeUp();
     }
     if(phase==='over'&&resultAt&&ts>=resultAt){
       resultAt=0;showResult(pendingResult||game.finish());
@@ -826,6 +848,12 @@ function drawFrame(){
 }
 function hudUpdate(){
   if(!game||!session)return;
+  if(!curDef.duration){
+    $('hudTime').textContent=game.hudInfo?game.hudInfo():'';
+    $('hudTime').classList.remove('warn');
+    $('hudTimeBar').classList.remove('warn');
+    return;
+  }
   const sc=Math.max(0,Math.round(session.score));
   if(sc!==lastHudScore){
     lastHudScore=sc;
@@ -2121,6 +2149,168 @@ registerGame({
 
 // ▼ 新しいミニゲームは registerGame({...}) をここに追加 ▼
 
+function checkWin(board){
+  const lines=[
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6],
+  ];
+  for(const line of lines){
+    const a=board[line[0]];
+    if(a&&a===board[line[1]]&&a===board[line[2]])return {winner:a,line:line.slice()};
+  }
+  return {winner:null,line:null};
+}
+
+/* ============================================================
+   ゲームD: まるばつ たいせん (2人対戦)
+   ============================================================ */
+registerGame({
+  id:'ox', emoji:'⭕', title:'まるばつ たいせん',
+  desc:'2人で あそぶ ○×ゲーム',
+  color:'#ffb84d', type:'versus',
+  howto:[
+    ['👆','マスを タップして ○×を おく'],
+    ['🏆','タテ・ヨコ・ナナメで 3つ そろえたら かち！'],
+    ['🔁','もう一度ボタンで すぐリセット'],
+  ],
+  create(ctx){
+    const A=ctx.audio;
+    const players=[{mark:'○',type:'human'},{mark:'×',type:'human'}];
+    const boardX=45,boardY=188,boardSize=330,cellSize=boardSize/3;
+    const resetBtn={x:116,y:654,w:188,h:54};
+    let board,current,winner,winLine,draw,moves,t;
+
+    function reset(){
+      board=Array(9).fill(null);
+      current=0;winner=null;winLine=null;draw=false;moves=0;t=0;
+    }
+    reset();
+
+    function cellAt(x,y){
+      if(x<boardX||x>=boardX+boardSize||y<boardY||y>=boardY+boardSize)return -1;
+      const col=Math.floor((x-boardX)/cellSize),row=Math.floor((y-boardY)/cellSize);
+      return row*3+col;
+    }
+    function inReset(x,y){
+      return x>=resetBtn.x&&x<=resetBtn.x+resetBtn.w&&y>=resetBtn.y&&y<=resetBtn.y+resetBtn.h;
+    }
+    function place(cell){
+      if(cell<0||cell>8||winner||draw||board[cell])return false;
+      const mark=players[current].mark;
+      board[cell]=mark;moves++;
+      const res=checkWin(board);
+      if(res.winner){
+        winner=res.winner;winLine=res.line;
+        A.perfect();
+      }else if(moves>=9){
+        draw=true;
+        A.good();
+      }else{
+        current=1-current;
+        A.pop();
+      }
+      return true;
+    }
+    function centerOf(cell){
+      const col=cell%3,row=Math.floor(cell/3);
+      return {x:boardX+col*cellSize+cellSize/2,y:boardY+row*cellSize+cellSize/2};
+    }
+    function drawMark(g,mark,x,y,scale=1){
+      const r=31*scale;
+      g.save();
+      g.lineCap='round';g.lineJoin='round';
+      if(mark==='○'){
+        g.strokeStyle='#ff5f91';g.lineWidth=11*scale;
+        g.beginPath();g.arc(x,y,r,0,TAU);g.stroke();
+        g.strokeStyle='rgba(255,255,255,.75)';g.lineWidth=3.5*scale;
+        g.beginPath();g.arc(x-3*scale,y-3*scale,r*.78,Math.PI*.95,Math.PI*1.45);g.stroke();
+      }else if(mark==='×'){
+        g.strokeStyle='#4ea8ff';g.lineWidth=12*scale;
+        g.beginPath();g.moveTo(x-r,y-r);g.lineTo(x+r,y+r);g.moveTo(x+r,y-r);g.lineTo(x-r,y+r);g.stroke();
+        g.strokeStyle='rgba(255,255,255,.75)';g.lineWidth=3.5*scale;
+        g.beginPath();g.moveTo(x-r*.8,y-r*.8);g.lineTo(x-r*.2,y-r*.2);g.moveTo(x+r*.8,y-r*.8);g.lineTo(x+r*.2,y-r*.2);g.stroke();
+      }
+      g.restore();
+    }
+    function statusText(){
+      if(winner)return winner+'の かち！';
+      if(draw)return 'ひきわけ！';
+      return players[current].mark+'の ばん';
+    }
+
+    return {
+      hudInfo(){return statusText()},
+      update(dt){t+=dt},
+      onDown(x,y){
+        if(inReset(x,y)){reset();A.pop();return}
+        if(winner||draw)return;
+        const cell=cellAt(x,y);
+        if(!place(cell)&&cell>=0)A.bad();
+      },
+      draw(g){
+        const pulse=1+Math.sin(t*5)*0.025;
+        const bg=g.createLinearGradient(0,0,0,H);
+        bg.addColorStop(0,'#fff4d8');bg.addColorStop(.58,'#ffe3ae');bg.addColorStop(1,'#ffc8b5');
+        g.fillStyle=bg;g.fillRect(0,0,W,H);
+        g.fillStyle='rgba(255,255,255,.42)';
+        for(let i=0;i<8;i++){
+          g.beginPath();g.arc(28+i*56,120+(i%2)*500,18,0,TAU);g.fill();
+        }
+        outlinedText(g,'まるばつ たいせん',W/2,112,25,'#fff','#8a4a28',6);
+        outlinedText(g,statusText(),W/2,148,24,winner?'#ff5f91':draw?'#5a4a78':'#39304f','#fff8ec',7);
+
+        g.fillStyle='rgba(90,55,30,.16)';
+        rr(g,boardX+5,boardY+8,boardSize,boardSize,24);g.fill();
+        g.fillStyle='#fffdf6';
+        rr(g,boardX,boardY,boardSize,boardSize,24);g.fill();
+        g.strokeStyle='#3a2d56';g.lineWidth=5;g.stroke();
+
+        if(winLine){
+          g.fillStyle='rgba(255,210,63,.35)';
+          for(const cell of winLine){
+            const col=cell%3,row=Math.floor(cell/3);
+            rr(g,boardX+col*cellSize+8,boardY+row*cellSize+8,cellSize-16,cellSize-16,18);g.fill();
+          }
+        }
+
+        g.strokeStyle='rgba(58,45,86,.45)';g.lineWidth=5;g.lineCap='round';
+        for(let i=1;i<3;i++){
+          g.beginPath();g.moveTo(boardX+i*cellSize,boardY+18);g.lineTo(boardX+i*cellSize,boardY+boardSize-18);g.stroke();
+          g.beginPath();g.moveTo(boardX+18,boardY+i*cellSize);g.lineTo(boardX+boardSize-18,boardY+i*cellSize);g.stroke();
+        }
+
+        for(let i=0;i<9;i++){
+          if(!board[i])continue;
+          const c=centerOf(i);
+          drawMark(g,board[i],c.x,c.y,winLine&&winLine.includes(i)?pulse:1);
+        }
+
+        if(winLine){
+          const a=centerOf(winLine[0]),b=centerOf(winLine[2]);
+          g.strokeStyle='rgba(255,122,0,.9)';g.lineWidth=10;g.lineCap='round';
+          g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();
+          g.strokeStyle='rgba(255,255,255,.8)';g.lineWidth=3;
+          g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();
+        }
+
+        const done=winner||draw;
+        g.fillStyle=done?'#fff8ec':'rgba(255,248,236,.72)';
+        rr(g,54,548,312,76,20);g.fill();
+        g.strokeStyle=done?'#3a2d56':'rgba(58,45,86,.35)';g.lineWidth=4;g.stroke();
+        outlinedText(g,done?statusText():'タップで おいてね',W/2,586,24,done?'#ff5f91':'#6b607d','#fff',6);
+
+        g.fillStyle='#ff5f91';
+        rr(g,resetBtn.x,resetBtn.y,resetBtn.w,resetBtn.h,18);g.fill();
+        g.strokeStyle='#b92e6e';g.lineWidth=5;g.stroke();
+        g.fillStyle='rgba(255,255,255,.28)';
+        rr(g,resetBtn.x+10,resetBtn.y+8,resetBtn.w-20,12,6);g.fill();
+        outlinedText(g,'もう一度',resetBtn.x+resetBtn.w/2,resetBtn.y+resetBtn.h/2+1,22,'#fff','#b92e6e',5);
+      },
+    };
+  }
+});
+
 /* ============================================================
    起動
    ============================================================ */
@@ -2131,7 +2321,7 @@ setupAnalytics();
 setupServiceWorker();
 window.__PGP={
   get game(){return game}, get phase(){return phase}, get def(){return curDef},
-  get session(){return session},GAMES,openGame,show,data,dailyInfo
+  get session(){return session},GAMES,openGame,show,data,dailyInfo,checkWin
 };
 </script>
 </body>
