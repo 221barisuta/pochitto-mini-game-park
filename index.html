@@ -2311,6 +2311,188 @@ registerGame({
   }
 });
 
+function checkGomoku(board,lastIndex){
+  const N=15;
+  if(lastIndex==null||lastIndex<0||lastIndex>=N*N)return {winner:null,line:null};
+  const mark=board[lastIndex];
+  if(!mark)return {winner:null,line:null};
+  const rowOf=i=>Math.floor(i/N),colOf=i=>i%N;
+  const dirs=[[1,0],[0,1],[1,1],[1,-1]];
+  for(const [dx,dy] of dirs){
+    let sx=colOf(lastIndex),sy=rowOf(lastIndex);
+    while(true){
+      const nx=sx-dx,ny=sy-dy;
+      if(nx<0||nx>=N||ny<0||ny>=N||board[ny*N+nx]!==mark)break;
+      sx=nx;sy=ny;
+    }
+    const line=[];
+    let x=sx,y=sy;
+    while(x>=0&&x<N&&y>=0&&y<N&&board[y*N+x]===mark){
+      line.push(y*N+x);
+      x+=dx;y+=dy;
+    }
+    if(line.length>=5)return {winner:mark,line:line.slice(0,5)};
+  }
+  return {winner:null,line:null};
+}
+
+/* ============================================================
+   ゲームE: ごもくならべ (2人対戦)
+   ============================================================ */
+registerGame({
+  id:'gomoku', emoji:'⚫', title:'ごもくならべ',
+  desc:'2人で あそぶ 五目ならべ',
+  color:'#cdb892', type:'versus',
+  howto:[
+    ['👆','こうてんを タップして いしを おく'],
+    ['🏆','タテ・ヨコ・ナナメに 5つ ならべたら かち！'],
+    ['🔁','きまったら タップで もういちど'],
+  ],
+  create(ctx){
+    const A=ctx.audio;
+    const N=15,GAP=23,BOARD=(N-1)*GAP,BX=(W-BOARD)/2,BY=198;
+    const panel={x:25,y:170,w:370,h:374};
+    const resetBtn={x:116,y:662,w:188,h:54};
+    const players=[{mark:'black',type:'human'},{mark:'white',type:'human'}];
+    const COL={black:'#2f2a35',white:'#fffdf6'};
+    const EDGE={black:'#17131f',white:'#b9a884'};
+    let board,current,winner,winLine,draw,moves,lastMove,t;
+
+    function reset(sound=false){
+      board=Array(N*N).fill(null);
+      current=0;winner=null;winLine=null;draw=false;moves=0;lastMove=-1;t=0;
+      if(sound)A.pop();
+    }
+    reset();
+
+    function label(mark){return mark==='black'?'●':'○'}
+    function statusText(){
+      if(winner)return label(winner)+'の かち！';
+      if(draw)return 'ひきわけ！';
+      return label(players[current].mark)+'の ばん';
+    }
+    function centerOf(idx){
+      return {x:BX+(idx%N)*GAP,y:BY+Math.floor(idx/N)*GAP};
+    }
+    function pointAt(x,y){
+      const col=Math.round((x-BX)/GAP),row=Math.round((y-BY)/GAP);
+      if(col<0||col>=N||row<0||row>=N)return -1;
+      const px=BX+col*GAP,py=BY+row*GAP;
+      if(Math.hypot(x-px,y-py)>15)return -1;
+      return row*N+col;
+    }
+    function inReset(x,y){
+      return x>=resetBtn.x&&x<=resetBtn.x+resetBtn.w&&y>=resetBtn.y&&y<=resetBtn.y+resetBtn.h;
+    }
+    function place(idx){
+      if(idx<0||idx>=N*N||winner||draw||board[idx])return false;
+      const mark=players[current].mark;
+      board[idx]=mark;moves++;lastMove=idx;
+      const res=checkGomoku(board,idx);
+      if(res.winner){
+        winner=res.winner;winLine=res.line;
+        A.perfect();banner(statusText());confetti();
+      }else if(moves>=N*N){
+        draw=true;A.good();banner('ひきわけ！');
+      }else{
+        current=1-current;
+        A.pop();
+        // 将来CPU: if(players[current].type==='cpu') place(getGomokuCpuMove(board,players[current].mark));
+      }
+      return true;
+    }
+    function drawStone(g,idx,mark,scale=1){
+      const c=centerOf(idx),r=9.5*scale;
+      g.save();
+      g.fillStyle='rgba(0,0,0,.22)';
+      g.beginPath();g.ellipse(c.x+1.8,c.y+2.4,r*1.04,r*.84,0,0,TAU);g.fill();
+      const grd=g.createRadialGradient(c.x-r*.35,c.y-r*.45,1,c.x,c.y,r*1.25);
+      if(mark==='black'){
+        grd.addColorStop(0,'#6c6377');grd.addColorStop(.45,COL.black);grd.addColorStop(1,'#11101a');
+      }else{
+        grd.addColorStop(0,'#ffffff');grd.addColorStop(.65,COL.white);grd.addColorStop(1,'#d7c9a7');
+      }
+      g.fillStyle=grd;
+      g.beginPath();g.arc(c.x,c.y,r,0,TAU);g.fill();
+      g.strokeStyle=EDGE[mark];g.lineWidth=mark==='black'?2.2:2.8;g.stroke();
+      g.restore();
+    }
+
+    return {
+      hudInfo(){return statusText()},
+      update(dt){t+=dt},
+      onDown(x,y){
+        if(inReset(x,y)){reset(true);return}
+        if(winner||draw){reset(true);return}
+        const idx=pointAt(x,y);
+        if(!place(idx)&&idx>=0)A.bad();
+      },
+      draw(g){
+        const bg=g.createLinearGradient(0,0,0,H);
+        bg.addColorStop(0,'#fff4d8');bg.addColorStop(.58,'#ead2a2');bg.addColorStop(1,'#f2b9a4');
+        g.fillStyle=bg;g.fillRect(0,0,W,H);
+        g.fillStyle='rgba(255,255,255,.34)';
+        for(let i=0;i<8;i++){g.beginPath();g.arc(28+i*56,118+(i%2)*505,18,0,TAU);g.fill()}
+        outlinedText(g,'ごもくならべ',W/2,110,25,'#fff','#6b4a2c',6);
+        outlinedText(g,statusText(),W/2,147,23,winner?'#ff5f91':draw?'#5a4a78':'#39304f','#fff8ec',7);
+
+        g.fillStyle='rgba(70,45,25,.18)';
+        rr(g,panel.x+5,panel.y+8,panel.w,panel.h,24);g.fill();
+        const wood=g.createLinearGradient(panel.x,panel.y,panel.x,panel.y+panel.h);
+        wood.addColorStop(0,'#f3d79d');wood.addColorStop(1,'#d8aa63');
+        g.fillStyle=wood;rr(g,panel.x,panel.y,panel.w,panel.h,24);g.fill();
+        g.strokeStyle='#3a2d56';g.lineWidth=5;g.stroke();
+
+        g.strokeStyle='rgba(77,49,28,.62)';g.lineWidth=1.4;g.lineCap='round';
+        for(let i=0;i<N;i++){
+          g.beginPath();g.moveTo(BX,BY+i*GAP);g.lineTo(BX+BOARD,BY+i*GAP);g.stroke();
+          g.beginPath();g.moveTo(BX+i*GAP,BY);g.lineTo(BX+i*GAP,BY+BOARD);g.stroke();
+        }
+        g.fillStyle='rgba(77,49,28,.75)';
+        for(const r of [3,7,11])for(const c of [3,7,11]){
+          g.beginPath();g.arc(BX+c*GAP,BY+r*GAP,3.2,0,TAU);g.fill();
+        }
+
+        if(winLine){
+          g.strokeStyle='rgba(255,210,63,.45)';g.lineWidth=19;g.lineCap='round';
+          const a=centerOf(winLine[0]),b=centerOf(winLine[winLine.length-1]);
+          g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();
+        }
+
+        for(let i=0;i<board.length;i++)if(board[i])drawStone(g,i,board[i],winLine&&winLine.includes(i)?1.16:1);
+
+        if(lastMove>=0&&!winner&&!draw){
+          const c=centerOf(lastMove);
+          g.save();g.globalAlpha=.85+.15*Math.sin(t*7);
+          g.strokeStyle=board[lastMove]==='black'?'#ffd23f':'#ff5f91';g.lineWidth=2.4;
+          g.beginPath();g.arc(c.x,c.y,14,0,TAU);g.stroke();
+          g.restore();
+        }
+        if(winLine){
+          const a=centerOf(winLine[0]),b=centerOf(winLine[winLine.length-1]);
+          g.strokeStyle='rgba(255,122,0,.92)';g.lineWidth=7;g.lineCap='round';
+          g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();
+          g.strokeStyle='rgba(255,255,255,.85)';g.lineWidth=2.2;
+          g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke();
+        }
+
+        const done=winner||draw;
+        g.fillStyle=done?'#fff8ec':'rgba(255,248,236,.74)';
+        rr(g,54,560,312,76,20);g.fill();
+        g.strokeStyle=done?'#3a2d56':'rgba(58,45,86,.35)';g.lineWidth=4;g.stroke();
+        outlinedText(g,done?statusText():'こうてんを タップ',W/2,598,23,done?'#ff5f91':'#6b607d','#fff',6);
+
+        g.fillStyle='#ff5f91';
+        rr(g,resetBtn.x,resetBtn.y,resetBtn.w,resetBtn.h,18);g.fill();
+        g.strokeStyle='#b92e6e';g.lineWidth=5;g.stroke();
+        g.fillStyle='rgba(255,255,255,.28)';
+        rr(g,resetBtn.x+10,resetBtn.y+8,resetBtn.w-20,12,6);g.fill();
+        outlinedText(g,'もう一度',resetBtn.x+resetBtn.w/2,resetBtn.y+resetBtn.h/2+1,22,'#fff','#b92e6e',5);
+      },
+    };
+  }
+});
+
 /* ============================================================
    起動
    ============================================================ */
