@@ -89,6 +89,17 @@ button{font-family:inherit;cursor:pointer;border:none}
 #scr-select{background:linear-gradient(170deg,#8ec5fc,#e0c3fc);justify-content:center;gap:2.2cqw;padding:3.5cqw 0}
 #scr-select h2{font-size:7cqw;font-weight:800;color:#fff;-webkit-text-stroke:1.2cqw #4a3d7a;paint-order:stroke fill;
   text-shadow:0 1cqw 0 rgba(74,61,122,.4)}
+.menu-tabs{width:88cqw;display:grid;grid-template-columns:1fr 1fr;gap:1.8cqw;background:rgba(255,255,255,.38);
+  border:.6cqw solid rgba(74,61,122,.45);border-radius:99px;padding:1cqw;box-shadow:inset 0 .5cqw 0 rgba(255,255,255,.3)}
+.menu-tab{min-height:9.8cqw;border-radius:99px;font-size:3.35cqw;font-weight:800;color:#5d5280;background:transparent;
+  display:flex;align-items:center;justify-content:center;gap:1cqw;transition:transform .1s, background .15s, color .15s}
+.menu-tab:active{transform:scale(.96)}
+.menu-tab.active{color:#fff;background:linear-gradient(180deg,#ff7ab2,#ff4d94);box-shadow:0 .8cqw 0 #b92e6e}
+.menu-tab[data-tab="versus"].active{background:linear-gradient(180deg,#5fd0ff,#2a9df0);box-shadow:0 .8cqw 0 #1b6aa8}
+.tab-count{min-width:4.8cqw;height:4.8cqw;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  font-size:2.7cqw;background:rgba(255,255,255,.75);color:#4a3d7a}
+.menu-tab.active .tab-count{background:#fff;color:#ff4d94}
+.menu-tab[data-tab="versus"].active .tab-count{color:#2a78c6}
 #dailyCard{width:88cqw;min-height:13cqw;border:.8cqw solid #70478f;border-radius:4cqw;background:#fff8d9;
   display:flex;align-items:center;justify-content:space-between;padding:2cqw 3.2cqw;color:#4a3365;
   box-shadow:0 1cqw 0 rgba(74,51,101,.35);font-weight:800}
@@ -105,6 +116,7 @@ button{font-family:inherit;cursor:pointer;border:none}
 .gcard .nm{font-size:4.3cqw;font-weight:800;color:#39304f;white-space:nowrap}
 .gcard .ds{font-size:3cqw;font-weight:700;color:#7a7090}
 .gcard .bs{font-size:2.8cqw;font-weight:800;color:#ff7a00;background:#fff3e0;border-radius:99px;padding:.4cqw 2.3cqw;align-self:flex-start}
+.gcard .bs.versus{color:#2674bc;background:#e7f5ff}
 .daily-chip{color:#fff;background:#ff5f91;border-radius:99px;padding:.35cqw 1.8cqw;font-size:2.5cqw;margin-left:1.5cqw}
 
 /* ---- game screen ---- */
@@ -213,6 +225,10 @@ button{font-family:inherit;cursor:pointer;border:none}
 
   <section id="scr-select" class="screen">
     <h2>ゲームを えらぼう！</h2>
+    <div id="menuTabs" class="menu-tabs" role="tablist" aria-label="ゲームカテゴリ">
+      <button class="menu-tab" type="button" data-tab="solo" role="tab">🎯 ひとりであそぶ<span class="tab-count" id="soloCount">0</span></button>
+      <button class="menu-tab" type="button" data-tab="versus" role="tab">⚔️ たいせん<span class="tab-count" id="versusCount">0</span></button>
+    </div>
     <button id="dailyCard" type="button"><b>きょうのチャレンジ</b><span id="dailyText"></span></button>
     <div id="cardList"></div>
     <div class="modal-actions">
@@ -313,7 +329,7 @@ const APP_CONFIG={
   rankingEndpoint:'',
   canonicalUrl:'https://221barisuta.github.io/pochitto-mini-game-park/'
 };
-const STORAGE_KEYS={profile:'pochitto:v2:user_profile',scores:'pochitto:v2:scores'};
+const STORAGE_KEYS={profile:'pochitto:v2:user_profile',scores:'pochitto:v2:scores',menuTab:'pochitto:v2:menu_tab'};
 const DEFAULT_PROFILE={
   version:2,
   settings:{muted:false},
@@ -378,9 +394,16 @@ function makeRng(seed){
   };
 }
 function seededPick(items,rng){return items[Math.floor(rng()*items.length)]}
+function soloGames(){return GAMES.filter(g=>g.type!=='versus')}
+function versusGames(){return GAMES.filter(g=>g.type==='versus')}
 function dailyInfo(){
   const key=localDayKey(),seed=hashString(`pochitto-v2:${key}`);
-  return {key,seed,index:seed%3};
+  const games=soloGames(),index=games.length?seed%games.length:-1;
+  return {key,seed,index,gameId:index>=0?games[index].id:null};
+}
+function dailyGame(){
+  const info=dailyInfo(),games=soloGames();
+  return info.index>=0?games[info.index]:null;
 }
 function track(name,params={}){
   const payload={event:name,...params};
@@ -643,6 +666,11 @@ const cv=$('cv'), g2d=cv.getContext('2d');
 
 const GAMES=[];
 function registerGame(def){GAMES.push(def)}
+function readMenuTab(){
+  try{return localStorage.getItem(STORAGE_KEYS.menuTab)==='versus'?'versus':'solo'}
+  catch(e){return 'solo'}
+}
+let activeMenuTab=readMenuTab();
 
 class ScoreSession{
   constructor(playCount){
@@ -1105,18 +1133,37 @@ function refreshBests(){
     if(el)el.textContent='BEST '+(data.scores.games[def.id]?.best||0);
   }
 }
+function saveMenuTab(tab){
+  activeMenuTab=tab==='versus'?'versus':'solo';
+  try{localStorage.setItem(STORAGE_KEYS.menuTab,activeMenuTab)}catch(e){}
+}
+function updateMenuTabs(){
+  const solo=soloGames(),versus=versusGames();
+  $('soloCount').textContent=solo.length;
+  $('versusCount').textContent=versus.length;
+  document.querySelectorAll('.menu-tab').forEach(btn=>{
+    const on=btn.dataset.tab===activeMenuTab;
+    btn.classList.toggle('active',on);
+    btn.setAttribute('aria-selected',on?'true':'false');
+  });
+}
 function buildCards(){
   const list=$('cardList');list.innerHTML='';
-  const daily=GAMES[dailyInfo().index];
+  const daily=dailyGame();
+  const showingSolo=activeMenuTab!=='versus';
+  const games=showingSolo?soloGames():versusGames();
+  updateMenuTabs();
+  $('dailyCard').style.display=showingSolo?'flex':'none';
   $('dailyText').textContent=daily?`${daily.emoji} ${daily.title}`:'';
-  for(const def of GAMES){
+  for(const def of games){
+    const versus=def.type==='versus';
     const c=document.createElement('button');
     c.className='gcard';
     c.style.setProperty('--c',def.color);
     c.innerHTML=`<span class="ic">${def.emoji}</span>
       <span class="tx"><span class="nm">${def.title}${def===daily?'<i class="daily-chip">TODAY</i>':''}</span>
       <span class="ds">${def.desc}</span>
-      <span class="bs" id="best-${def.id}">ベスト 0</span></span>`;
+      ${versus?'<span class="bs versus">ローカル2人</span>':`<span class="bs" id="best-${def.id}">BEST 0</span>`}</span>`;
     c.addEventListener('click',()=>{AudioKit.ensureRunning();AudioKit.pop();openGame(def,false,'free')});
     list.appendChild(c);
   }
@@ -1139,6 +1186,15 @@ function spawnTitleEmojis(){
 }
 
 function enterSelect(){refreshBests();buildCards();show('scr-select')}
+document.querySelectorAll('.menu-tab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const tab=btn.dataset.tab==='versus'?'versus':'solo';
+    if(tab===activeMenuTab)return;
+    AudioKit.pop();
+    saveMenuTab(tab);
+    buildCards();
+  });
+});
 $('btnToSelect').addEventListener('click',()=>{
   if(!data.profile.audioChoiceMade)$('audioChoice').classList.remove('hidden');
   else{AudioKit.ensureRunning();AudioKit.pop();enterSelect()}
@@ -1153,9 +1209,9 @@ $('btnBackTitle').addEventListener('click',()=>{AudioKit.pop();show('scr-title')
 $('btnQuit').addEventListener('click',()=>{AudioKit.pop();quitGame()});
 $('btnHowtoStart').addEventListener('click',()=>{AudioKit.pop();startCountdown()});
 $('btnRetry').addEventListener('click',retryCurrent);
-$('btnToSelect2').addEventListener('click',()=>{AudioKit.pop();refreshBests();show('scr-select')});
+$('btnToSelect2').addEventListener('click',()=>{AudioKit.pop();enterSelect()});
 $('dailyCard').addEventListener('click',()=>{
-  const def=GAMES[dailyInfo().index];if(def){AudioKit.ensureRunning();AudioKit.pop();openGame(def,false,'daily')}
+  const def=dailyGame();if(def){AudioKit.ensureRunning();AudioKit.pop();openGame(def,false,'daily')}
 });
 $('muteBtn').addEventListener('click',()=>{
   if(AudioKit.muted)AudioKit.unlockFromGesture(true).then(()=>{AudioKit.setMuted(false);AudioKit.pop();updateMute()});
@@ -2331,7 +2387,7 @@ function checkGomoku(board,lastIndex){
       line.push(y*N+x);
       x+=dx;y+=dy;
     }
-    if(line.length>=5)return {winner:mark,line:line.slice(0,5)};
+    if(line.length>=5)return {winner:mark,line:line.slice()};
   }
   return {winner:null,line:null};
 }
